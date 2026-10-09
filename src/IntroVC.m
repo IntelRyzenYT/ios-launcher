@@ -958,12 +958,9 @@ extern bool g_skipIntro;
 	if ([[GCSharedUtils appGroupID] isEqualToString:@"Unknown"]) {
 		subtitleLabel.text = @"To continue, you'll need to import your .p12 signing certificate you used to sign the app.\n\nThis will be used to sign mods and get around the code signing requirement. You will also need the certificate password as well.\nIf you do not have a .p12 signing certificate, and you haven't paid for a certificate, please use SideStore instead.";
 	} else {
-		if (![self getCertFromSideStore]) {
-			subtitleLabel.text = @"To continue, you'll need to import your signing certificate from AltStore/SideStore.\n\nYou can obtain the certificate by opening the app -> tapping settings -> scrolling down -> tap \"Export Signing Certificate\", entering any password of choice! (123456 as as an example) -> then the p12 file will be exported!\nIf you are using a newer version of SideStore, instead of tapping \"Export Signing Certificate\", tap \"Certificate Management\" -> Hold on the certificate as if you're selecting the text (hold on either \"iloader (R)\" or text saying \"SideStore Certificate\") -> Tap Export Certificate -> Tap \"Export full\", entering any password of choice! (123456 as as an example) -> then the p12 file will be exported!\nMake sure to remember the password.";
-		} else {
-			[self afterPromptCert];
-			return;
-		}
+		subtitleLabel.text = @"To continue, you'll need to import your signing certificate from AltStore/SideStore.\n\nYou can obtain the certificate by opening the app -> tapping settings -> scrolling down -> tap \"Export Signing Certificate\", entering any password of choice! (123456 as as an example) -> then the p12 file will be exported!\nIf you are using a newer version of SideStore, instead of tapping \"Export Signing Certificate\", tap \"Certificate Management\" -> Hold on the certificate as if you're selecting the text (hold on either \"iloader (R)\" or text saying \"SideStore Certificate\") -> Tap Export Certificate -> Tap \"Export full\", entering any password of choice! (123456 as as an example) -> then the p12 file will be exported!\nMake sure to remember the password.";
+
+		[self promptSideStoreCert];
 	}
 	[view addSubview:subtitleLabel];
 
@@ -1007,22 +1004,36 @@ extern bool g_skipIntro;
 	[self transitionToView:view];
 }
 
-- (BOOL)getCertFromSideStore {
+- (void)promptSideStoreCert {
 	if ([LCUtils store] != SideStore)
-		return NO;
+		return;
 
 	NSURL* url = [NSURL
 			URLWithString:
 			[NSString stringWithFormat:
 							@"%@://certificate?callback_template=%@%%3A%%2F%%2Fcertificate%%3Fcert%%3D%%24%%28BASE64_CERT%%29%%26password%%3D%%24%%28PASSWORD%%29",
 							[[LCUtils getStoreName] lowercaseString], NSBundle.mainBundle.infoDictionary[@"CFBundleURLTypes"][0][@"CFBundleURLSchemes"][0]]];
-	AppLog(@"using %@", url);
+
 	if (![[UIApplication sharedApplication] canOpenURL:url])
-		return NO;
-	
-	[[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
-	return YES;
-	
+		return;
+
+	UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"SideStore Detected!"
+															  message:@"Would you like to import the signing certificate from SideStore?"
+															  preferredStyle:UIAlertControllerStyleAlert];
+	UIAlertAction *yesAction = [UIAlertAction actionWithTitle:@"Yes"
+											  style:UIAlertActionStyleCancel
+											  handler:^(UIAlertAction *action) {
+												[[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+												[self afterPromptCert];
+											  }];
+
+	UIAlertAction *importManuallyAction = [UIAlertAction actionWithTitle:@"Import Manually"
+											  style:UIAlertActionStyleDefault
+											  handler:nil];
+
+	[alert addAction:yesAction];
+	[alert addAction:importManuallyAction];
+	[self presentViewController:alert animated:YES completion:nil];
 }
 
 
